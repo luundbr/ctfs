@@ -1,0 +1,36 @@
+keeper
+
+	22 and 80 open
+
+	the page is running request tracker 4.4.4
+	default credentials of root password get us in
+	googling just to see if this version has any easy vulnerabilities, and apparently it doesn't
+
+	after looking around, in the users tab there's lnorgaard with default password of Welcome2023!
+	trying to ssh in with this gives user flag
+
+	in user home there's RT30000.zip
+	scping this back and unzipping gives a .dmp microsoft minidump file (wtf?) and a .kdbx keepass database
+
+	decrypting the database requires a key, apparently extracted from the dump
+
+	running strings on it or trying minidump.py doesn't do shit, but some googling finds this:
+		https://github.com/vdohney/keepass-password-dumper
+
+	it gives a bunch of results with broken characters, we don't have the proper font/charset?
+
+	googling any of them finds this:
+		https://www.thespruceeats.com/rodgrod-med-flode-danish-red-berry-pudding-2952748
+
+	apparently the broken character is ø
+
+	trying upper/lowercase variations lets us in with password rødgrød med fløde
+
+	apparently root's password is F4><3K0nd!, but we can't ssh with this (it only allows keys?)
+
+	looks like the key is in .ppk (putty) format, using puttygen to convert it to openssh
+	puttygen key -O private-openssh -o rootkey
+
+	ssh -i rootkey in, cat /root/root.txt
+
+	gg

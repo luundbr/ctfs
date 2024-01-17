@@ -1,0 +1,23 @@
+relevant
+
+	80 runs a windows server dotnet app with nothing interesting
+	
+	139 smb - might be interesting
+
+		nt4wrksv share is not protected
+			it has passwords.txt
+
+			[User Passwords - Encoded]
+			Qm9iIC0gIVBAJCRXMHJEITEyMw==
+			QmlsbCAtIEp1dzRubmFNNG40MjA2OTY5NjkhJCQk
+
+			Base64 decoded:
+				Bob - !P@$$W0rD!123
+				Bill - Juw4nnaM4n420696969!$$$
+						
+	3389 - might be interesting too
+
+	49663 - dotnet app identical to port 80 (wtf)
+	
+	49666 - not http
+	49669 - not http

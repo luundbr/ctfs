@@ -14,10 +14,13 @@ relevant
 			Base64 decoded:
 				Bob - !P@$$W0rD!123
 				Bill - Juw4nnaM4n420696969!$$$
-						
-	3389 - might be interesting too
 
-	49663 - dotnet app identical to port 80 (wtf)
+			impacket-psexec doesn't connect
+						
+	3389 - rdp, might be interesting too
+		connecting with Bob's account resets connection, other credentials aren't accepted
+
+	49663 - dotnet app identical to port 80 (wtf?)
 	
 	49666 - not http
 	49669 - not http

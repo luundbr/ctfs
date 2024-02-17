@@ -139,6 +139,10 @@ bizness
 						
 						outputs
 						monkeybizness - b8fd3f41a541a435857a8f3e751cc3a91c174362
+
+						this password is for user ofbiz, su with it (after uploading our public key) gives root, cat /root/root.txt gives flag
+
+						gg (seriously though, why in the universe is this box easy? ofbiz is like the most obscure shit ever to research)
 						
 						
 

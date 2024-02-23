@@ -40,7 +40,34 @@ forest
 
 		opening in bloodhound
 		
+		mark user as owned
+
+		queries -> shortest paths from owned principals
+			user is a member of Account Operators:
+				Description Members can administer domain user and group accounts
+			group and by extension user has GenericAll relationship to EXCH01.HTB.LOCAL
+
+		queries -> shortest paths to high value targets
+			htb.local -> shortests paths to here
+			exchange windows permissions has writedacl to htb.local
+			exchange windows permissions -> shortest paths to here
+			account operators has genericall to this node
+
+		we can add our user to exchange windows permissions
+		Add-DomainGroupMember -Identity 'Domain Admins' -Members 'svc-alfresco' -Credential s3rvice from help didn't work,
+		but net group "Exchange Windows Permissions" svc-alfresco /add /domain did
+
+		now to add dcsync permission with powerview
+
+		https://viperone.gitbook.io/pentest-everything/everything/everything-active-directory/credential-access/credential-dumping/dcsync/dcsync-attack
+
+		...
+
+		I drop this box for now, it's extremely tiring, unfun, requires a lot of magic, metagaming and writeup reading.
+		Sometime in the future we come back
 		
+		BG
+
 	445/tcp   open  microsoft-ds
 	464/tcp   open  kpasswd5
 	593/tcp   open  http-rpc-epmap

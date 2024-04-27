@@ -1,0 +1,12 @@
+headless
+
+	PORT     STATE SERVICE
+	22/tcp   open  ssh
+	5000/tcp open  upnp
+		server is python flask?
+		request sets an interesting cookie
+			Set-Cookie is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs; Path=/
+	
+		the form actually sends requests
+			POST http://10.10.11.8:5000/support
+			fname=qwe&lname=qwe&email=qwe%40qwe.qwe&phone=213&message=23

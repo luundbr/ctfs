@@ -1,0 +1,44 @@
+22/tcp   open  ssh
+80/tcp   open  http
+3000/tcp open  ppp  Golang net/http server
+
+no subdomains
+no directories
+
+url uses /?file=welcome-to-greenhorn to display its pages
+
+port 3000 hosts gitea
+
+going to /admin.php, version is 4.7.18
+
+looking for pluck cms exploit, rce exploits require password
+
+looking at login.php sources, it reads a variable called $ww to compare password
+	this is defined in pass.php, and it's a sha512 hash
+	this hash matches to iloveyou1
+	we successfully log in
+	using the exploit from exploit.db we get a reverse shell
+
+there's mysql on 3306 but it doesn't seem accessible
+
+there's user git, password auth works there, iloveyou1 doesn't pass
+
+there's a user junior
+	trying to log in gives an error, so password auth is disabled
+		we need to find/upload keys?
+	there's writable /usr/local/bin/gitea though impossible to overwrite because busy
+	su - junior password: iloveyou1 worked
+	we get user.txt
+
+extract pdf file
+
+extract image from pdf file
+
+use depix with default search image to get password
+
+remove spaces from password
+
+we get root
+
+bg terrible troll box :(
+

